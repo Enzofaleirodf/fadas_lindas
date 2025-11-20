@@ -52,6 +52,16 @@ export interface FoodItem {
   isHealthy: boolean;
 }
 
+export interface CardTheme {
+  id: string;
+  name: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  pattern: string;
+  border: string;
+}
+
 export interface SavedMemory {
   id: string;
   date: string;
@@ -59,4 +69,5 @@ export interface SavedMemory {
   score: number;
   letter: string;
   themeColor: string;
+  theme?: CardTheme;
 }

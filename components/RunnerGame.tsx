@@ -15,6 +15,7 @@ interface RunnerGameProps {
 export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterName, difficulty }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
+  const [starsCollected, setStarsCollected] = useState(0);
   const [playerPosition, setPlayerPosition] = useState(50);
   const [obstacles, setObstacles] = useState<{id: number, x: number, y: number, type: 'germ'|'star'|'castle', variant?: 1|2|3|4}[]>([]);
   const [finishLineAppeared, setFinishLineAppeared] = useState(false);
@@ -39,6 +40,7 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
+    setStarsCollected(0);
     setGameOver(false);
     setHasWon(false);
     setObstacles([]);
@@ -108,9 +110,10 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
           
           if (obs.type === 'star') {
              audioService.playCollect();
+             setStarsCollected(s => s + 1);
              setScore(s => s + 100);
              // Remove estrela movendo para longe visualmente
-             obs.x = -100; 
+             obs.x = -100;
              obs.y = -100;
           } else if (obs.type === 'germ') {
              audioService.playError();
@@ -214,13 +217,20 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
                 <h2 className="text-5xl font-display font-bold text-fabula-primary mb-2">Chegada no Castelo!</h2>
                 <p className="text-xl text-gray-600 mb-6 font-bold">Vitória Mágica!</p>
 
-                <div className="bg-fabula-secondary/10 p-6 rounded-2xl border-2 border-fabula-secondary/20 mb-8 w-full max-w-sm">
+                <div className="bg-fabula-secondary/10 p-4 rounded-2xl border-2 border-fabula-secondary/20 mb-6 w-full max-w-sm space-y-3">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <MapPin size={24} className="text-fabula-secondary" />
-                            <span className="text-gray-700 font-bold uppercase text-sm">Distância Total</span>
+                            <MapPin size={20} className="text-fabula-secondary" />
+                            <span className="text-gray-700 font-bold uppercase text-xs">Distância Total</span>
                         </div>
-                        <span className="text-3xl font-display font-bold text-fabula-secondary">{score}m</span>
+                        <span className="text-2xl font-display font-bold text-fabula-secondary">{score}m</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-yellow-400/20 p-3 rounded-xl border border-yellow-400/30">
+                        <div className="flex items-center gap-2">
+                            <Star size={20} className="text-yellow-500 fill-yellow-500" />
+                            <span className="text-gray-700 font-bold uppercase text-xs">Estrelas Coletadas</span>
+                        </div>
+                        <span className="text-2xl font-display font-bold text-yellow-600">{starsCollected}</span>
                     </div>
                 </div>
 
@@ -270,8 +280,14 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
             </div>
         ))}
 
-        <div className="absolute top-4 right-4 bg-white/80 px-4 py-2 rounded-full font-bold font-display text-2xl text-fabula-primary z-30 border border-fabula-primary shadow-sm">
-            {Math.floor(score / 10)} m
+        <div className="absolute top-4 right-4 flex flex-col gap-2 z-30">
+            <div className="bg-white/80 px-4 py-2 rounded-full font-bold font-display text-2xl text-fabula-primary border border-fabula-primary shadow-sm">
+                {Math.floor(score / 10)} m
+            </div>
+            <div className="bg-yellow-400/90 px-4 py-2 rounded-full font-bold font-display text-xl text-white border-2 border-yellow-500 shadow-sm flex items-center gap-2">
+                <Star className="fill-white w-5 h-5" />
+                {starsCollected}
+            </div>
         </div>
     </div>
   );

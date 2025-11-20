@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppStage, Character, Difficulty, GameState, CursorMode, SavedMemory } from './types';
-import { LORE, SONG_LYRICS } from './constants';
+import { AppStage, Character, Difficulty, GameState, CursorMode, SavedMemory, CardTheme } from './types';
+import { LORE, SONG_LYRICS, CARD_THEMES } from './constants';
 import { generateFairyLetter } from './services/geminiService';
 import { audioService } from './services/audioService';
 import { storageService } from './services/storageService';
@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [lyricIndex, setLyricIndex] = useState(0);
   const [savedMemories, setSavedMemories] = useState<SavedMemory[]>([]);
   const [bestScore, setBestScore] = useState(0);
+  const [currentCardTheme, setCurrentCardTheme] = useState<CardTheme>(CARD_THEMES[0]);
 
   // --- CURSOR LOGIC ---
   const getCursorMode = () => {
@@ -101,26 +102,31 @@ const App: React.FC = () => {
   const handleEnding = async (scoreToAdd: number) => {
     const finalScore = gameState.score + scoreToAdd;
     setGameState(prev => ({ ...prev, score: finalScore, stage: AppStage.ENDING }));
-    
+
     if (gameState.selectedCharacter) {
+      // Escolhe um tema aleatório para a carta
+      const randomTheme = CARD_THEMES[Math.floor(Math.random() * CARD_THEMES.length)];
+      setCurrentCardTheme(randomTheme);
+
       setIsLoadingLetter(true);
       setLyricIndex(0);
-      
+
       // Gera a carta
       const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
       const letterPromise = generateFairyLetter(gameState.selectedCharacter, finalScore);
       const [letter] = await Promise.all([letterPromise, minDelay]);
-      
+
       setFairyLetter(letter);
       setIsLoadingLetter(false);
       audioService.playWin();
 
-      // Salva no Baú automaticamente
+      // Salva no Baú automaticamente com tema
       storageService.saveMemory({
         character: gameState.selectedCharacter,
         score: finalScore,
         letter: letter,
-        themeColor: gameState.selectedCharacter === Character.SOPHIE ? '#F29B93' : '#8ACABB'
+        themeColor: gameState.selectedCharacter === Character.SOPHIE ? '#F29B93' : '#8ACABB',
+        theme: randomTheme
       });
       setBestScore(Math.max(bestScore, finalScore));
     }
@@ -303,41 +309,63 @@ const App: React.FC = () => {
             </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
-                {savedMemories.map((memory) => (
-                    <div key={memory.id} className="bg-white p-6 rounded-2xl shadow-md border-4 hover:shadow-xl transition-all transform hover:-translate-y-1" style={{ borderColor: memory.themeColor }}>
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-                            {/* EXIBE O NOME DA JOGADORA AQUI */}
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
-                                     {/* Simple avatar placeholder based on char */}
-                                     <div className="w-full h-full" style={{ backgroundColor: memory.themeColor }}></div>
+                {savedMemories.map((memory) => {
+                    const theme = memory.theme || CARD_THEMES[0];
+                    return (
+                    <div key={memory.id} className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-2 relative overflow-hidden" style={{ border: theme.border }}>
+                        {/* Background Pattern */}
+                        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: `url("${theme.pattern}")` }}></div>
+
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b-2" style={{ borderColor: theme.primary + '30' }}>
+                                {/* EXIBE O NOME DA JOGADORA AQUI */}
+                                <div className="flex items-center gap-2">
+                                    <div className="w-12 h-12 rounded-full overflow-hidden border-3 shadow-md" style={{ borderColor: theme.primary, borderWidth: '3px' }}>
+                                         <img
+                                            src={memory.character === Character.SOPHIE ? "https://files.catbox.moe/lrszum.jpeg" : "https://files.catbox.moe/3qpa2c.jpeg"}
+                                            alt={memory.character}
+                                            className="w-full h-full object-cover"
+                                         />
+                                    </div>
+                                    <div>
+                                        <span className="font-display text-xl font-bold block" style={{ color: theme.primary }}>
+                                            {memory.character}
+                                        </span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
+                                            backgroundColor: theme.secondary + '40',
+                                            color: theme.accent
+                                        }}>
+                                            {theme.name}
+                                        </span>
+                                    </div>
                                 </div>
-                                <span className="font-display text-2xl font-bold" style={{ color: memory.themeColor }}>
-                                    {memory.character}
+                                <span className="text-xs text-gray-400 font-bold bg-white px-2 py-1 rounded shadow-sm">{memory.date}</span>
+                            </div>
+
+                            <div className="bg-white/90 backdrop-blur-sm p-5 rounded-xl mb-4 relative shadow-sm" style={{ border: `2px solid ${theme.primary}20` }}>
+                                 <Sparkles className="absolute -top-2 -right-2" size={24} fill={theme.accent} style={{ color: theme.accent }} />
+                                 <p className="italic text-gray-700 font-sans text-sm leading-relaxed">
+                                    "{memory.letter}"
+                                 </p>
+                            </div>
+
+                            <div className="flex justify-between items-center">
+                                <div className="flex gap-1">
+                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
+                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
+                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
+                                </div>
+                                <span className="text-sm font-bold px-3 py-1 rounded-full shadow-sm" style={{
+                                    backgroundColor: theme.primary + '20',
+                                    color: theme.accent
+                                }}>
+                                    Score: {memory.score}
                                 </span>
                             </div>
-                            <span className="text-xs text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded">{memory.date}</span>
-                        </div>
-                        
-                        <div className="bg-fabula-bg/30 p-5 rounded-xl mb-4 relative">
-                             <Sparkles className="absolute -top-2 -right-2 text-yellow-400" size={24} fill="currentColor" />
-                             <p className="italic text-gray-700 font-sans text-sm leading-relaxed">
-                                "{memory.letter}"
-                             </p>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                            <div className="flex gap-1">
-                                <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                                <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                                <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                            </div>
-                            <span className="text-sm font-bold bg-gray-100 px-3 py-1 rounded-full text-gray-600">
-                                Score: {memory.score}
-                            </span>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
         )}
       </div>
@@ -345,37 +373,48 @@ const App: React.FC = () => {
   );
 
   const renderStoryScreen = (title: string, text: string, onNext: () => void, icon: React.ReactNode, colorClass: string) => (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-6 ${colorClass}`}>
-      <div className="max-w-2xl text-center bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border-b-8 border-fabula-primary">
-        <div className="inline-block p-4 rounded-full bg-gray-100 mb-6">{icon}</div>
-        <h2 className="text-4xl md:text-5xl font-display font-bold text-fabula-primary mb-6">{title}</h2>
-        <p className="text-xl text-gray-600 mb-10 font-sans">{text}</p>
-        <Button onClick={onNext} variant="primary">VAMOS LÁ!</Button>
+    <div className={`min-h-[100dvh] flex flex-col items-center justify-center p-4 md:p-6 ${colorClass}`}>
+      <div className="max-w-2xl w-full text-center bg-white p-6 md:p-10 lg:p-12 rounded-[2rem] md:rounded-[3rem] shadow-2xl border-b-8 border-fabula-primary">
+        <div className="inline-block p-3 md:p-4 rounded-full bg-gray-100 mb-4 md:mb-6">{icon}</div>
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-fabula-primary mb-4 md:mb-6 leading-tight">{title}</h2>
+        <p className="text-base md:text-lg lg:text-xl text-gray-600 mb-6 md:mb-10 font-sans leading-relaxed">{text}</p>
+        <Button onClick={onNext} variant="primary" className="px-6 py-3 md:px-8 md:py-4">VAMOS LÁ!</Button>
       </div>
     </div>
   );
 
   // --- TELA FINAL ---
   const renderEnding = () => (
-    <div className="min-h-screen h-full bg-white p-6 py-12 overflow-y-auto flex flex-col items-center">
-       <div className="max-w-3xl w-full bg-white rounded-[2rem] shadow-2xl border-4 border-fabula-accent text-center relative z-10 my-auto overflow-hidden">
-         
+    <div className="min-h-[100dvh] w-full bg-white p-4 md:p-6 py-8 md:py-12 overflow-y-auto flex items-center justify-center">
+       <div className="max-w-3xl w-full bg-white rounded-[2rem] shadow-2xl text-center relative z-10 my-auto" style={{ border: currentCardTheme.border }}>
+
          {/* Header Sólido */}
-         <div className="bg-fabula-bg p-8 border-b-4 border-fabula-accent">
-            <Crown size={60} className="text-fabula-secondary mx-auto mb-4 animate-bounce" />
+         <div className="p-8 border-b-4" style={{
+           backgroundColor: currentCardTheme.secondary + '40',
+           borderColor: currentCardTheme.primary
+         }}>
+            <Crown size={60} className="mx-auto mb-4 animate-bounce" style={{ color: currentCardTheme.primary }} />
             <h2 className="text-5xl md:text-6xl font-display font-bold text-fabula-primary drop-shadow-sm">
               Missão Cumprida!
             </h2>
+            <div className="text-sm font-bold mt-2 px-4 py-1 rounded-full inline-block" style={{
+              backgroundColor: currentCardTheme.primary + '20',
+              color: currentCardTheme.accent
+            }}>
+              ⭐ {currentCardTheme.name} ⭐
+            </div>
          </div>
 
-         <div className="p-6 md:p-10">
+         <div className="p-4 md:p-6 lg:p-10" style={{ backgroundImage: `url("${currentCardTheme.pattern}")` }}>
              {/* Caixa da Carta (Design de Card Colecionável) */}
-             <div className="bg-white p-6 md:p-8 rounded-2xl border-2 border-fabula-primary/10 shadow-inner mb-8 relative transform transition-all hover:scale-[1.02]">
-               <div className="absolute -top-3 -left-3 text-fabula-secondary transform -rotate-12">
-                  <Star fill="currentColor" size={40} />
+             <div className="bg-white p-4 md:p-6 lg:p-8 rounded-2xl shadow-inner mb-6 md:mb-8 relative transform transition-all hover:scale-[1.02]" style={{
+               border: `3px solid ${currentCardTheme.primary}30`
+             }}>
+               <div className="absolute -top-3 -left-3 transform -rotate-12">
+                  <Star fill={currentCardTheme.accent} size={40} style={{ color: currentCardTheme.accent }} />
                </div>
-               <div className="absolute -bottom-3 -right-3 text-fabula-accent transform rotate-12">
-                  <Heart fill="currentColor" size={40} />
+               <div className="absolute -bottom-3 -right-3 transform rotate-12">
+                  <Heart fill={currentCardTheme.secondary} size={40} style={{ color: currentCardTheme.secondary }} />
                </div>
 
                <h3 className="text-xl font-bold text-fabula-primary uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
@@ -399,26 +438,26 @@ const App: React.FC = () => {
              
              {/* Stats Grid */}
              {!isLoadingLetter && (
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-gray-50 p-4 rounded-xl text-center">
+                <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8">
+                    <div className="bg-gray-50 p-3 md:p-4 rounded-xl text-center">
                         <p className="text-xs text-gray-400 font-bold uppercase">Pontos Totais</p>
-                        <p className="text-3xl font-display font-bold text-fabula-primary">{gameState.score}</p>
+                        <p className="text-2xl md:text-3xl font-display font-bold text-fabula-primary">{gameState.score}</p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-xl text-center">
+                    <div className="bg-gray-50 p-3 md:p-4 rounded-xl text-center">
                         <p className="text-xs text-gray-400 font-bold uppercase">Jogadora</p>
-                        <p className="text-2xl font-display font-bold text-fabula-secondary">{gameState.selectedCharacter}</p>
+                        <p className="text-xl md:text-2xl font-display font-bold text-fabula-secondary">{gameState.selectedCharacter}</p>
                     </div>
                 </div>
              )}
 
              {!isLoadingLetter && (
-                 <div className="flex flex-col gap-3">
-                    <Button onClick={handleRestart} variant="primary" className="w-full py-4 text-xl animate-pulse">
+                 <div className="flex flex-col gap-3 pb-2">
+                    <Button onClick={handleRestart} variant="primary" className="w-full py-3 md:py-4 text-lg md:text-xl animate-pulse">
                         JOGAR NOVAMENTE
                     </Button>
-                    <button 
+                    <button
                         onClick={handleOpenMemories}
-                        className="text-gray-400 font-bold text-sm hover:text-fabula-primary transition-colors"
+                        className="text-gray-400 font-bold text-sm hover:text-fabula-primary transition-colors py-2"
                     >
                         Ver Galeria de Memórias
                     </button>
