@@ -103,7 +103,7 @@ export const MemoryGame: React.FC<MemoryGameProps> = ({ onComplete, difficulty }
   };
 
   return (
-    <div className="w-full bg-white rounded-3xl p-6 md:p-8 shadow-2xl border-4 border-fabula-accent text-center max-w-3xl relative overflow-hidden min-h-[500px] flex flex-col">
+    <div className="w-full bg-white rounded-3xl p-6 md:p-8 shadow-2xl border-4 border-fabula-accent text-center max-w-3xl relative overflow-hidden min-h-[500px] md:min-h-[600px] flex flex-col">
       
       {/* HUD */}
       <div className="mb-4 md:mb-8 flex justify-between items-center font-display text-2xl md:text-3xl text-fabula-primary opacity-80 border-b pb-4 border-fabula-accent/20">
@@ -137,7 +137,8 @@ export const MemoryGame: React.FC<MemoryGameProps> = ({ onComplete, difficulty }
 
       {/* TELA DE VITÓRIA (Overlay) */}
       {isFinished && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl p-4 md:p-8 text-center animate-fade-in overflow-y-auto">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl p-4 md:p-6 text-center animate-fade-in overflow-y-auto">
+          <div className="flex flex-col items-center w-full max-w-md my-auto">
            <div className="relative mb-3 md:mb-6">
                <div className="absolute inset-0 bg-yellow-200 blur-xl rounded-full animate-pulse"></div>
                <Trophy size={60} className="text-yellow-400 fill-yellow-400 relative z-10 animate-bounce md:w-20 md:h-20" />
@@ -171,6 +172,7 @@ export const MemoryGame: React.FC<MemoryGameProps> = ({ onComplete, difficulty }
            <Button onClick={() => onComplete(finalScore)} variant="primary" className="animate-pulse shadow-xl text-base md:text-lg px-6 md:px-8 py-3 md:py-4">
              PRÓXIMA FASE
            </Button>
+          </div>
         </div>
       )}
     </div>

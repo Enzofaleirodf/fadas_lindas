@@ -22,12 +22,12 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   const [isInvulnerable, setIsInvulnerable] = useState(false);
   const [lives, setLives] = useState(3);
 
-  // Configuração balanceada - AJUSTADA
+  // Configuração balanceada - AJUSTADA V2
   const getDifficultySettings = () => {
     switch (difficulty) {
-        case Difficulty.EASY: return { speed: 0.6, goal: 1500, spawnRate: 0.015 };
-        case Difficulty.HARD: return { speed: 1.0, goal: 2500, spawnRate: 0.03 };
-        default: return { speed: 0.8, goal: 2000, spawnRate: 0.02 }; // MEDIUM
+        case Difficulty.EASY: return { speed: 0.7, goal: 2500, spawnRate: 0.018 }; // ~42s
+        case Difficulty.HARD: return { speed: 1.2, goal: 3500, spawnRate: 0.035 }; // ~58s
+        default: return { speed: 0.9, goal: 3000, spawnRate: 0.025 }; // MEDIUM ~50s
     }
   };
   const settings = getDifficultySettings();
@@ -35,6 +35,7 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   const [gameSpeed] = useState(settings.speed);
   const [gameOver, setGameOver] = useState(false);
   const [hasWon, setHasWon] = useState(false);
+  const [isLanding, setIsLanding] = useState(false);
 
   const requestRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +55,7 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
     setStarsCollected(0);
     setGameOver(false);
     setHasWon(false);
+    setIsLanding(false);
     setObstacles([]);
     setPlayerPosition(50);
     setFinishLineAppeared(false);
@@ -113,21 +115,34 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
         });
     }
 
-    // Mover e filtrar obstáculos
+    // Mover e filtrar obstáculos (para castelo quando ganha)
     obstaclesRef.current = obstaclesRef.current
-        .map(obs => ({ ...obs, x: obs.x - gameSpeed }))
+        .map(obs => {
+          // Se venceu, para o castelo
+          if (obs.type === 'castle' && (gameOverRef.current || isLanding)) {
+            return obs; // Não move mais
+          }
+          return { ...obs, x: obs.x - gameSpeed };
+        })
         .filter(obs => obs.type === 'castle' ? true : obs.x > -5);
 
     // Verificar colisões - IMPORTANTE: verificar antes de modificar o array
     const idsToRemove: number[] = [];
 
     obstaclesRef.current.forEach(obs => {
-      // Vitória com castelo - proximidade em X e Y
-      if (obs.type === 'castle' && obs.x < 40 && Math.abs(playerPositionRef.current - 55) < 20) {
-          // Parar loop imediatamente antes de chamar handleWin
-          gameOverRef.current = true;
-          handleWin();
-          return;
+      // Vitória com castelo - detecção melhorada
+      if (obs.type === 'castle') {
+        const FAIRY_X = 10; // Posição da fada (left-10 = 10%)
+        const CASTLE_TRIGGER_X = 15; // Margem de segurança
+
+        // Detecta quando castelo passa pela fada
+        if (obs.x <= CASTLE_TRIGGER_X && obs.x > 0) {
+          // Verifica alinhamento vertical (player perto do centro Y=55)
+          if (Math.abs(playerPositionRef.current - 55) < 25) {
+            handleWin();
+            return;
+          }
+        }
       }
 
       // Detecção de colisão - hitbox mais precisa
@@ -213,12 +228,17 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   };
 
   const handleWin = () => {
-    gameOverRef.current = true; // Para imediatamente
-    setHasWon(true);
-    setIsPlaying(false);
-    setGameOver(true);
-    setScore(settings.goal);
-    audioService.playWin();
+    setIsLanding(true); // Ativa animação de pouso
+
+    // Pequeno delay para animação de chegada
+    setTimeout(() => {
+      gameOverRef.current = true;
+      setHasWon(true);
+      setIsPlaying(false);
+      setGameOver(true);
+      setScore(settings.goal);
+      audioService.playWin();
+    }, 800); // 800ms para animação
   };
 
   useEffect(() => {
@@ -253,9 +273,9 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="w-full max-w-4xl h-96 bg-blue-100 rounded-3xl relative overflow-hidden shadow-2xl border-4 border-fabula-secondary cursor-none touch-none"
+      className="w-full max-w-4xl h-96 md:h-[500px] bg-blue-100 rounded-3xl relative overflow-hidden shadow-2xl border-4 border-fabula-secondary cursor-none touch-none"
       onMouseMove={handleInput}
       onTouchMove={handleInput}
     >
@@ -328,7 +348,11 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
 
         {/* Fada (Player) */}
         <div
-            className={`absolute left-10 w-16 h-16 transition-all duration-75 ease-out z-20 ${hasWon ? 'opacity-0' : 'opacity-100'} ${isInvulnerable ? 'animate-pulse' : ''}`}
+            className={`absolute left-10 w-16 h-16 transition-all z-20
+              ${hasWon ? 'opacity-0' : 'opacity-100'}
+              ${isInvulnerable ? 'animate-pulse' : ''}
+              ${isLanding ? 'animate-bounce duration-500' : 'duration-75 ease-out'}
+            `}
             style={{ top: `${playerPosition}%`, transform: 'translateY(-50%)' }}
         >
             <div className="relative">
