@@ -19,23 +19,34 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   const [playerPosition, setPlayerPosition] = useState(50);
   const [obstacles, setObstacles] = useState<{id: number, x: number, y: number, type: 'germ'|'star'|'castle', variant?: 1|2|3|4}[]>([]);
   const [finishLineAppeared, setFinishLineAppeared] = useState(false);
-  
-  // Configuração balanceada para 20 segundos de gameplay
+  const [isInvulnerable, setIsInvulnerable] = useState(false);
+  const [lives, setLives] = useState(3);
+
+  // Configuração balanceada - AJUSTADA
   const getDifficultySettings = () => {
     switch (difficulty) {
-        case Difficulty.EASY: return { speed: 0.6, goal: 1500, spawnRate: 0.02 };
-        case Difficulty.HARD: return { speed: 1.4, goal: 3000, spawnRate: 0.05 };
-        default: return { speed: 0.9, goal: 2000, spawnRate: 0.03 }; // MEDIUM
+        case Difficulty.EASY: return { speed: 0.6, goal: 1500, spawnRate: 0.015 };
+        case Difficulty.HARD: return { speed: 1.0, goal: 2500, spawnRate: 0.03 };
+        default: return { speed: 0.8, goal: 2000, spawnRate: 0.02 }; // MEDIUM
     }
   };
   const settings = getDifficultySettings();
 
-  const [gameSpeed, setGameSpeed] = useState(settings.speed);
+  const [gameSpeed] = useState(settings.speed);
   const [gameOver, setGameOver] = useState(false);
   const [hasWon, setHasWon] = useState(false);
-  
+
   const requestRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const obstaclesRef = useRef<{id: number, x: number, y: number, type: 'germ'|'star'|'castle', variant?: 1|2|3|4}[]>([]);
+  const scoreRef = useRef(0);
+  const starsRef = useRef(0);
+  const finishLineRef = useRef(false);
+  const isInvulnerableRef = useRef(false);
+  const gameOverRef = useRef(false);
+  const livesRef = useRef(3);
+  const invulnerabilityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const obstacleIdRef = useRef(0);
 
   const startGame = () => {
     setIsPlaying(true);
@@ -45,119 +56,190 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
     setHasWon(false);
     setObstacles([]);
     setPlayerPosition(50);
-    setGameSpeed(settings.speed);
     setFinishLineAppeared(false);
+    setIsInvulnerable(false);
+    setLives(3);
+
+    // Resetar todas as refs
+    obstaclesRef.current = [];
+    scoreRef.current = 0;
+    starsRef.current = 0;
+    finishLineRef.current = false;
+    isInvulnerableRef.current = false;
+    gameOverRef.current = false;
+    livesRef.current = 3;
+    obstacleIdRef.current = 0;
+    playerPositionRef.current = 50;
+
+    // Limpar timer de invulnerabilidade se existir
+    if (invulnerabilityTimerRef.current) {
+      clearTimeout(invulnerabilityTimerRef.current);
+      invulnerabilityTimerRef.current = null;
+    }
+
     audioService.playZap();
   };
 
-  const updateGame = () => {
-    if (!isPlaying || gameOver) return;
+  const playerPositionRef = useRef(50);
 
-    // Gerar Chegada (Castelo) quando perto da meta
-    if (!finishLineAppeared && score >= settings.goal - 300) {
+  const updateGame = () => {
+    if (!isPlaying || gameOverRef.current) return;
+
+    // Aumenta score
+    scoreRef.current += 1;
+    setScore(scoreRef.current);
+
+    // Gerar Castelo quando perto da meta
+    if (!finishLineRef.current && scoreRef.current >= settings.goal - 300) {
+         finishLineRef.current = true;
          setFinishLineAppeared(true);
-         setObstacles(prev => [...prev, {
-             id: Date.now(),
-             x: 130, // Nasce bem longe
-             y: 55, // Centralizado verticalmente
+         obstaclesRef.current.push({
+             id: obstacleIdRef.current++,
+             x: 130,
+             y: 55,
              type: 'castle'
-         }]);
+         });
     }
 
-    // Gerar obstáculos normais apenas se a chegada não apareceu
-    if (!finishLineAppeared) {
-        setObstacles(prev => {
-            if (Math.random() < settings.spawnRate) {
-                const isStar = Math.random() > 0.6;
-                prev.push({
-                id: Date.now(),
-                x: 110,
-                y: Math.random() * 80 + 10,
-                type: isStar ? 'star' : 'germ',
-                variant: isStar ? undefined : (Math.floor(Math.random() * 4) + 1) as 1|2|3|4
-                });
-            }
-            return prev;
+    // Gerar obstáculos normais
+    if (!finishLineRef.current && Math.random() < settings.spawnRate) {
+        const isStar = Math.random() > 0.6;
+        obstaclesRef.current.push({
+            id: obstacleIdRef.current++,
+            x: 110,
+            y: Math.random() * 80 + 10,
+            type: isStar ? 'star' : 'germ',
+            variant: isStar ? undefined : (Math.floor(Math.random() * 4) + 1) as 1|2|3|4
         });
     }
 
-    // Mover Obstáculos
-    setObstacles(prev => 
-      prev
+    // Mover e filtrar obstáculos
+    obstaclesRef.current = obstaclesRef.current
         .map(obs => ({ ...obs, x: obs.x - gameSpeed }))
-        // Não remove o castelo se ele passar da tela (embora devamos parar antes)
-        .filter(obs => obs.type === 'castle' ? true : obs.x > -20)
-    );
+        .filter(obs => obs.type === 'castle' ? true : obs.x > -5);
 
-    // Colisão
-    obstacles.forEach(obs => {
-      
-      // LÓGICA DE VITÓRIA (CASTELO)
-      if (obs.type === 'castle') {
-          // Se o castelo chegar perto da fada (X < 40), Ganha!
-          if (obs.x < 40) {
-              handleWin();
-          }
-          return; 
+    // Verificar colisões - IMPORTANTE: verificar antes de modificar o array
+    const idsToRemove: number[] = [];
+
+    obstaclesRef.current.forEach(obs => {
+      // Vitória com castelo - proximidade em X e Y
+      if (obs.type === 'castle' && obs.x < 40 && Math.abs(playerPositionRef.current - 55) < 20) {
+          // Parar loop imediatamente antes de chamar handleWin
+          gameOverRef.current = true;
+          handleWin();
+          return;
       }
 
-      // Lógica normal para germes e estrelas
-      // Checa se está na mesma faixa horizontal (X)
-      if (obs.x < 15 && obs.x > 5) {
-        const playerY = playerPosition;
-        // Checa se está na mesma altura vertical (Y)
-        if (Math.abs(playerY - obs.y) < 12) {
-          
-          if (obs.type === 'star') {
-             audioService.playCollect();
-             setStarsCollected(s => s + 1);
-             setScore(s => s + 100);
-             // Remove estrela movendo para longe visualmente
-             obs.x = -100;
-             obs.y = -100;
-          } else if (obs.type === 'germ') {
-             audioService.playError();
-             handleGameOver();
-          }
+      // Detecção de colisão - hitbox mais precisa
+      const FAIRY_X = 10; // Fada está em left-10 (10% da tela)
+      const FAIRY_SIZE = 6; // Tamanho visual da fada
+      const OBSTACLE_SIZE = 5; // Tamanho dos obstáculos
+
+      // Colisão só acontece quando realmente se tocam
+      const isNearHorizontally = obs.x >= (FAIRY_X - OBSTACLE_SIZE) && obs.x <= (FAIRY_X + FAIRY_SIZE);
+      const isNearVertically = Math.abs(playerPositionRef.current - obs.y) < (FAIRY_SIZE + OBSTACLE_SIZE) / 2;
+
+      if (isNearHorizontally && isNearVertically) {
+        if (obs.type === 'star') {
+           // Coletar estrela
+           audioService.playCollect();
+           starsRef.current += 1;
+           scoreRef.current += 100;
+           setStarsCollected(starsRef.current);
+           setScore(scoreRef.current);
+           idsToRemove.push(obs.id);
+        } else if (obs.type === 'germ' && !isInvulnerableRef.current) {
+           // Colidir com germe
+           audioService.playError();
+           idsToRemove.push(obs.id);
+           handleHit();
         }
       }
     });
 
-    // Score só aumenta se não tiver ganhado ainda
-    if (!gameOver && !hasWon) {
-        setScore(s => s + 1);
+    // Remover obstáculos coletados/colididos ANTES de atualizar state
+    if (idsToRemove.length > 0) {
+      obstaclesRef.current = obstaclesRef.current.filter(o => !idsToRemove.includes(o.id));
     }
+
+    // Atualizar state com obstáculos filtrados
+    setObstacles([...obstaclesRef.current]);
     requestRef.current = requestAnimationFrame(updateGame);
   };
 
   const handleGameOver = () => {
+    gameOverRef.current = true;
     setGameOver(true);
     setIsPlaying(false);
+
+    // Limpar timer de invulnerabilidade
+    if (invulnerabilityTimerRef.current) {
+      clearTimeout(invulnerabilityTimerRef.current);
+      invulnerabilityTimerRef.current = null;
+    }
+  };
+
+  const handleHit = () => {
+    // Usar setState funcional para evitar race condition
+    setLives(prevLives => {
+      const newLives = prevLives - 1;
+      livesRef.current = newLives;
+
+      if (newLives <= 0) {
+        // Game Over - perdeu todas as vidas
+        handleGameOver();
+      } else {
+        // Limpar timer anterior se existir
+        if (invulnerabilityTimerRef.current) {
+          clearTimeout(invulnerabilityTimerRef.current);
+        }
+
+        // Perde uma vida mas continua jogando
+        isInvulnerableRef.current = true;
+        setIsInvulnerable(true);
+        playerPositionRef.current = 50;
+        setPlayerPosition(50);
+
+        // Remove invulnerabilidade após 1.5 segundos
+        invulnerabilityTimerRef.current = setTimeout(() => {
+          isInvulnerableRef.current = false;
+          setIsInvulnerable(false);
+          invulnerabilityTimerRef.current = null;
+        }, 1500);
+      }
+
+      return newLives;
+    });
   };
 
   const handleWin = () => {
+    gameOverRef.current = true; // Para imediatamente
     setHasWon(true);
-    setIsPlaying(false); // Para o loop do jogo
-    setGameOver(true); 
-    setScore(settings.goal); 
+    setIsPlaying(false);
+    setGameOver(true);
+    setScore(settings.goal);
     audioService.playWin();
   };
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && !gameOver) {
         requestRef.current = requestAnimationFrame(updateGame);
     }
     return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        if (invulnerabilityTimerRef.current) {
+          clearTimeout(invulnerabilityTimerRef.current);
+          invulnerabilityTimerRef.current = null;
+        }
     };
-  }, [isPlaying, obstacles, playerPosition, settings.goal, settings.spawnRate, finishLineAppeared]); 
+  }, [isPlaying]); 
 
   const handleInput = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current || !isPlaying) return;
-    
+
     const rect = containerRef.current.getBoundingClientRect();
     let clientY;
-    
+
     if ('touches' in e) {
         clientY = e.touches[0].clientY;
     } else {
@@ -165,7 +247,9 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
     }
 
     const relativeY = ((clientY - rect.top) / rect.height) * 100;
-    setPlayerPosition(Math.max(5, Math.min(95, relativeY)));
+    const newPosition = Math.max(5, Math.min(95, relativeY));
+    playerPositionRef.current = newPosition; // Atualiza ref
+    setPlayerPosition(newPosition);
   };
 
   return (
@@ -204,49 +288,51 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
 
         {/* TELA VITÓRIA (FINAL) */}
         {hasWon && (
-             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-50 cursor-auto animate-fade-in backdrop-blur-md">
-                 <div className="relative mb-4">
-                    <div className="absolute -inset-4 bg-yellow-200 blur-xl rounded-full opacity-50 animate-pulse"></div>
-                    <img 
-                       src="https://files.catbox.moe/dajv5y.png" 
-                       alt="Castelo" 
-                       className="h-32 w-auto object-contain relative z-10 drop-shadow-lg"
-                    />
+             <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-50 cursor-auto animate-fade-in backdrop-blur-md p-4 overflow-y-auto">
+                 <div className="flex flex-col items-center justify-center w-full max-w-md my-auto">
+                     <div className="relative mb-3 md:mb-4">
+                        <div className="absolute -inset-4 bg-yellow-200 blur-xl rounded-full opacity-50 animate-pulse"></div>
+                        <img
+                           src="https://files.catbox.moe/dajv5y.png"
+                           alt="Castelo"
+                           className="h-16 md:h-24 lg:h-28 w-auto object-contain relative z-10 drop-shadow-lg"
+                        />
+                     </div>
+
+                    <h2 className="text-xl md:text-2xl lg:text-3xl font-display font-bold text-fabula-primary mb-1 md:mb-2 text-center">Chegada no Castelo!</h2>
+                    <p className="text-sm md:text-base text-gray-600 mb-2 md:mb-3 font-bold">Vitória Mágica!</p>
+
+                    <div className="bg-fabula-secondary/10 p-3 md:p-4 rounded-xl border-2 border-fabula-secondary/20 mb-3 md:mb-4 w-full space-y-2">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <MapPin size={18} className="text-fabula-secondary md:w-5 md:h-5" />
+                                <span className="text-gray-700 font-bold uppercase text-xs">Distância Total</span>
+                            </div>
+                            <span className="text-lg md:text-xl font-display font-bold text-fabula-secondary">{score}m</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-yellow-400/20 p-3 rounded-xl border border-yellow-400/30">
+                            <div className="flex items-center gap-2">
+                                <Star size={18} className="text-yellow-500 fill-yellow-500 md:w-5 md:h-5" />
+                                <span className="text-gray-700 font-bold uppercase text-xs">Estrelas Coletadas</span>
+                            </div>
+                            <span className="text-lg md:text-xl font-display font-bold text-yellow-600">{starsCollected}</span>
+                        </div>
+                    </div>
+
+                    <Button onClick={() => onComplete(score)} variant="primary" className="animate-pulse text-sm md:text-base px-6 py-2.5 w-full">
+                        RECEBER CARTA MÁGICA
+                    </Button>
                  </div>
-
-                <h2 className="text-5xl font-display font-bold text-fabula-primary mb-2">Chegada no Castelo!</h2>
-                <p className="text-xl text-gray-600 mb-6 font-bold">Vitória Mágica!</p>
-
-                <div className="bg-fabula-secondary/10 p-4 rounded-2xl border-2 border-fabula-secondary/20 mb-6 w-full max-w-sm space-y-3">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <MapPin size={20} className="text-fabula-secondary" />
-                            <span className="text-gray-700 font-bold uppercase text-xs">Distância Total</span>
-                        </div>
-                        <span className="text-2xl font-display font-bold text-fabula-secondary">{score}m</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-yellow-400/20 p-3 rounded-xl border border-yellow-400/30">
-                        <div className="flex items-center gap-2">
-                            <Star size={20} className="text-yellow-500 fill-yellow-500" />
-                            <span className="text-gray-700 font-bold uppercase text-xs">Estrelas Coletadas</span>
-                        </div>
-                        <span className="text-2xl font-display font-bold text-yellow-600">{starsCollected}</span>
-                    </div>
-                </div>
-
-                <Button onClick={() => onComplete(score)} variant="primary" className="animate-pulse text-xl px-8 py-4">
-                    RECEBER CARTA MÁGICA
-                </Button>
             </div>
         )}
 
         {/* Fada (Player) */}
-        <div 
-            className={`absolute left-10 w-16 h-16 transition-all duration-75 ease-out z-20 ${hasWon ? 'opacity-0' : 'opacity-100'}`}
+        <div
+            className={`absolute left-10 w-16 h-16 transition-all duration-75 ease-out z-20 ${hasWon ? 'opacity-0' : 'opacity-100'} ${isInvulnerable ? 'animate-pulse' : ''}`}
             style={{ top: `${playerPosition}%`, transform: 'translateY(-50%)' }}
         >
             <div className="relative">
-                <div className="absolute -inset-4 bg-white/40 blur-md rounded-full"></div>
+                <div className={`absolute -inset-4 blur-md rounded-full ${isInvulnerable ? 'bg-red-400/60' : 'bg-white/40'}`}></div>
                 <span className="text-5xl drop-shadow-lg relative z-10">🧚‍♀️</span>
             </div>
         </div>
@@ -280,13 +366,20 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
             </div>
         ))}
 
-        <div className="absolute top-4 right-4 flex flex-col gap-2 z-30">
-            <div className="bg-white/80 px-4 py-2 rounded-full font-bold font-display text-2xl text-fabula-primary border border-fabula-primary shadow-sm">
-                {Math.floor(score / 10)} m
+        <div className="absolute top-4 left-4 z-30">
+            <div className="bg-red-500/90 px-4 py-2 rounded-full font-bold font-display text-xl text-white border-2 border-red-600 shadow-sm flex items-center gap-2">
+                <span className="text-2xl">❤️</span>
+                <span>x {lives}</span>
             </div>
+        </div>
+
+        <div className="absolute top-4 right-4 flex gap-3 z-30">
             <div className="bg-yellow-400/90 px-4 py-2 rounded-full font-bold font-display text-xl text-white border-2 border-yellow-500 shadow-sm flex items-center gap-2">
                 <Star className="fill-white w-5 h-5" />
                 {starsCollected}
+            </div>
+            <div className="bg-white/80 px-4 py-2 rounded-full font-bold font-display text-2xl text-fabula-primary border border-fabula-primary shadow-sm">
+                {Math.floor(score / 10)} m
             </div>
         </div>
     </div>

@@ -71,3 +71,43 @@ export interface SavedMemory {
   themeColor: string;
   theme?: CardTheme;
 }
+
+// Sistema de Cartas Colecionáveis
+export enum CardRarity {
+  COMMON = 'comum',
+  RARE = 'rara',
+  EPIC = 'épica',
+  LEGENDARY = 'lendária'
+}
+
+export interface CollectibleCard {
+  id: string;
+  character: Character;
+  rarity: CardRarity;
+  theme: string;
+  letterText: string;
+  imageUrl?: string;
+  stats: {
+    score: number;
+    starsCollected: number;
+    difficulty: Difficulty;
+    gamesCompleted: string[];
+    date: string;
+  };
+  metadata: {
+    cardNumber: number;
+    seasonYear: string;
+    promptTheme: string;
+    promptTone: string;
+    promptFormat: string;
+  };
+}
+
+export interface GameContext {
+  character: Character;
+  difficulty: Difficulty;
+  totalScore: number;
+  starsCollected: number;
+  gamesCompleted: string[];
+  previousCards: number;
+}

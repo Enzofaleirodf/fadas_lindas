@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppStage, Character, Difficulty, GameState, CursorMode, SavedMemory, CardTheme } from './types';
+import { AppStage, Character, Difficulty, GameState, CursorMode, SavedMemory, CardTheme, CollectibleCard, GameContext, CardRarity } from './types';
 import { LORE, SONG_LYRICS, CARD_THEMES } from './constants';
-import { generateFairyLetter } from './services/geminiService';
+import { generateCollectibleCard } from './services/openaiService';
 import { audioService } from './services/audioService';
 import { storageService } from './services/storageService';
 import { Button } from './components/Button';
@@ -27,11 +27,23 @@ const App: React.FC = () => {
   const [savedMemories, setSavedMemories] = useState<SavedMemory[]>([]);
   const [bestScore, setBestScore] = useState(0);
   const [currentCardTheme, setCurrentCardTheme] = useState<CardTheme>(CARD_THEMES[0]);
+  const [currentCard, setCurrentCard] = useState<CollectibleCard | null>(null);
+  const [starsCollected, setStarsCollected] = useState(0);
 
   // --- CURSOR LOGIC ---
   const getCursorMode = () => {
     if (gameState.stage === AppStage.GAME_LASER) return CursorMode.LASER;
     return CursorMode.NORMAL;
+  };
+
+  // --- RARITY HELPERS ---
+  const getRarityColor = (rarity: string) => {
+    switch (rarity) {
+      case 'lendária': return { bg: '#ffd700', border: '#ffaa00', glow: '#ffea00', text: '#8B4513' };
+      case 'épica': return { bg: '#a855f7', border: '#7c3aed', glow: '#c084fc', text: '#ffffff' };
+      case 'rara': return { bg: '#3b82f6', border: '#2563eb', glow: '#60a5fa', text: '#ffffff' };
+      default: return { bg: '#9ca3af', border: '#6b7280', glow: '#d1d5db', text: '#1f2937' };
+    }
   };
 
   useEffect(() => {
@@ -77,6 +89,15 @@ const App: React.FC = () => {
     setGameState(prev => ({ ...prev, stage: AppStage.MEMORIES }));
   };
 
+  const [collectibleCards, setCollectibleCards] = useState<CollectibleCard[]>([]);
+  const [cardFilter, setCardFilter] = useState<'all' | 'comum' | 'rara' | 'épica' | 'lendária'>('all');
+
+  useEffect(() => {
+    if (gameState.stage === AppStage.MEMORIES) {
+      setCollectibleCards(storageService.getCards());
+    }
+  }, [gameState.stage]);
+
   // Calcula o melhor score de cada personagem
   const getBestScoreByCharacter = (character: Character) => {
     return savedMemories
@@ -119,20 +140,34 @@ const App: React.FC = () => {
       setIsLoadingLetter(true);
       setLyricIndex(0);
 
-      // Gera a carta
-      const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
-      const letterPromise = generateFairyLetter(gameState.selectedCharacter, finalScore);
-      const [letter] = await Promise.all([letterPromise, minDelay]);
+      // Criar contexto do jogo para gerar carta colecionável
+      const gameContext: GameContext = {
+        character: gameState.selectedCharacter,
+        difficulty: gameState.difficulty,
+        totalScore: finalScore,
+        starsCollected: starsCollected,
+        gamesCompleted: gameState.completedMissions,
+        previousCards: storageService.getTotalCards()
+      };
 
-      setFairyLetter(letter);
+      // Gera a carta colecionável
+      const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
+      const cardPromise = generateCollectibleCard(gameContext);
+      const [card] = await Promise.all([cardPromise, minDelay]);
+
+      setCurrentCard(card);
+      setFairyLetter(card.letterText);
       setIsLoadingLetter(false);
       audioService.playWin();
 
-      // Salva no Baú automaticamente com tema
+      // Salva a carta colecionável
+      storageService.saveCard(card);
+
+      // Mantém compatibilidade com memórias antigas
       storageService.saveMemory({
         character: gameState.selectedCharacter,
         score: finalScore,
-        letter: letter,
+        letter: card.letterText,
         themeColor: gameState.selectedCharacter === Character.SOPHIE ? '#F29B93' : '#8ACABB',
         theme: randomTheme
       });
@@ -149,6 +184,8 @@ const App: React.FC = () => {
         completedMissions: []
     });
     setFairyLetter('');
+    setCurrentCard(null);
+    setStarsCollected(0);
     audioService.playBackgroundMelody();
   }
 
@@ -287,36 +324,36 @@ const App: React.FC = () => {
   );
 
   const renderMemories = () => (
-    <div className="min-h-screen bg-fabula-bg p-6 overflow-y-auto">
+    <div className="min-h-screen bg-fabula-bg p-4 md:p-6 overflow-y-auto">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8 sticky top-0 bg-fabula-bg z-20 py-4">
-           <button onClick={() => setGameState(prev => ({ ...prev, stage: AppStage.CHARACTER_SELECT }))} className="p-3 bg-white rounded-full shadow-md hover:scale-105 text-fabula-primary">
-              <ArrowLeft size={24} />
+        <div className="flex items-center justify-between mb-4 md:mb-6 sticky top-0 bg-fabula-bg z-20 py-3">
+           <button onClick={() => setGameState(prev => ({ ...prev, stage: AppStage.CHARACTER_SELECT }))} className="p-2 md:p-3 bg-white rounded-full shadow-md hover:scale-105 text-fabula-primary">
+              <ArrowLeft size={20} className="md:w-6 md:h-6" />
            </button>
-           <h2 className="text-4xl md:text-5xl font-display font-bold text-fabula-primary flex items-center gap-2">
-             <Archive className="text-fabula-secondary" /> Galeria Mágica
+           <h2 className="text-2xl md:text-4xl font-display font-bold text-fabula-primary flex items-center gap-2">
+             <Archive className="text-fabula-secondary w-6 h-6 md:w-8 md:h-8" /> Galeria Mágica
            </h2>
-           <div className="w-12"></div> 
+           <div className="w-8 md:w-12"></div>
         </div>
 
         {/* Cards de Recordes - Um para cada Fada */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
             {/* Recorde da Fada Sophie */}
-            <div className="bg-white p-6 rounded-3xl shadow-lg flex flex-col items-center border-4 border-fabula-secondary relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-fabula-secondary/10 w-32 h-32 rounded-full -mr-16 -mt-16"></div>
+            <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-lg flex flex-col items-center border-2 md:border-4 border-fabula-secondary relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-fabula-secondary/10 w-24 h-24 md:w-32 md:h-32 rounded-full -mr-12 md:-mr-16 -mt-12 md:-mt-16"></div>
                 <div className="relative z-10 flex flex-col items-center w-full">
-                    <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-fabula-secondary shadow-lg mb-3">
+                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-full overflow-hidden border-2 md:border-4 border-fabula-secondary shadow-lg mb-2 md:mb-3">
                         <img
                             src="https://files.catbox.moe/lrszum.jpeg"
                             alt="Fada Sophie"
                             className="w-full h-full object-cover"
                         />
                     </div>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
-                    <h3 className="text-2xl font-display font-bold text-fabula-secondary mb-2">Fada Sophie</h3>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
+                    <h3 className="text-lg md:text-2xl font-display font-bold text-fabula-secondary mb-1 md:mb-2">Fada Sophie</h3>
                     <div className="flex items-center gap-2">
-                        <Trophy size={24} className="text-yellow-500 fill-yellow-500" />
-                        <p className="text-4xl font-display font-bold text-fabula-primary">
+                        <Trophy size={20} className="text-yellow-500 fill-yellow-500 md:w-6 md:h-6" />
+                        <p className="text-2xl md:text-4xl font-display font-bold text-fabula-primary">
                             {getBestScoreByCharacter(Character.SOPHIE)} pts
                         </p>
                     </div>
@@ -324,21 +361,21 @@ const App: React.FC = () => {
             </div>
 
             {/* Recorde da Fada Julie */}
-            <div className="bg-white p-6 rounded-3xl shadow-lg flex flex-col items-center border-4 border-fabula-accent relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-fabula-accent/10 w-32 h-32 rounded-full -mr-16 -mt-16"></div>
+            <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-lg flex flex-col items-center border-2 md:border-4 border-fabula-accent relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-fabula-accent/10 w-24 h-24 md:w-32 md:h-32 rounded-full -mr-12 md:-mr-16 -mt-12 md:-mt-16"></div>
                 <div className="relative z-10 flex flex-col items-center w-full">
-                    <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-fabula-accent shadow-lg mb-3">
+                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-full overflow-hidden border-2 md:border-4 border-fabula-accent shadow-lg mb-2 md:mb-3">
                         <img
                             src="https://files.catbox.moe/3qpa2c.jpeg"
                             alt="Fada Julie"
                             className="w-full h-full object-cover"
                         />
                     </div>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
-                    <h3 className="text-2xl font-display font-bold text-fabula-accent mb-2">Fada Julie</h3>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
+                    <h3 className="text-lg md:text-2xl font-display font-bold text-fabula-accent mb-1 md:mb-2">Fada Julie</h3>
                     <div className="flex items-center gap-2">
-                        <Trophy size={24} className="text-yellow-500 fill-yellow-500" />
-                        <p className="text-4xl font-display font-bold text-fabula-primary">
+                        <Trophy size={20} className="text-yellow-500 fill-yellow-500 md:w-6 md:h-6" />
+                        <p className="text-2xl md:text-4xl font-display font-bold text-fabula-primary">
                             {getBestScoreByCharacter(Character.JULIE)} pts
                         </p>
                     </div>
@@ -346,26 +383,158 @@ const App: React.FC = () => {
             </div>
         </div>
 
+        {/* Collectible Cards Section */}
+        {collectibleCards.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl md:text-2xl font-display font-bold text-fabula-primary flex items-center gap-2">
+                ✨ Cartas Colecionáveis ({collectibleCards.length})
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCardFilter('all')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                    cardFilter === 'all' ? 'bg-fabula-primary text-white' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  Todas
+                </button>
+                {storageService.getRarityStats()[CardRarity.LEGENDARY] > 0 && (
+                  <button
+                    onClick={() => setCardFilter('lendária')}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      cardFilter === 'lendária' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    👑 Lendárias
+                  </button>
+                )}
+                {storageService.getRarityStats()[CardRarity.EPIC] > 0 && (
+                  <button
+                    onClick={() => setCardFilter('épica')}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      cardFilter === 'épica' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    Épicas
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {collectibleCards
+                .filter(card => cardFilter === 'all' || card.rarity === cardFilter)
+                .map((card) => {
+                  const rarityColors = getRarityColor(card.rarity);
+                  return (
+                    <div
+                      key={card.id}
+                      className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 overflow-hidden relative"
+                      style={{
+                        border: `3px solid ${rarityColors.border}`,
+                        boxShadow: `0 4px 20px ${rarityColors.glow}40`
+                      }}
+                    >
+                      {/* Rarity Badge */}
+                      <div
+                        className="absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold uppercase z-10"
+                        style={{
+                          backgroundColor: rarityColors.bg,
+                          color: rarityColors.text
+                        }}
+                      >
+                        {card.rarity === 'lendária' && '👑'} {card.rarity}
+                      </div>
+
+                      {/* Card Number */}
+                      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded-full text-xs font-bold z-10">
+                        #{card.metadata.cardNumber}
+                      </div>
+
+                      {/* Card Header */}
+                      <div className="p-4 border-b" style={{ backgroundColor: rarityColors.bg + '20' }}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-full overflow-hidden border-2" style={{ borderColor: rarityColors.border }}>
+                            <img
+                              src={card.character === Character.SOPHIE ? "https://files.catbox.moe/lrszum.jpeg" : "https://files.catbox.moe/3qpa2c.jpeg"}
+                              alt={card.character}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-display font-bold text-sm" style={{ color: rarityColors.border }}>
+                              {card.character}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(card.stats.date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Content */}
+                      <div className="p-4">
+                        <div className="bg-gray-50 p-3 rounded-lg mb-3 min-h-[80px]">
+                          <p className="text-xs italic text-gray-700 line-clamp-4">
+                            "{card.letterText}"
+                          </p>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Pontos</p>
+                            <p className="text-sm font-bold text-fabula-primary">{card.stats.score}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">⭐</p>
+                            <p className="text-sm font-bold text-yellow-600">{card.stats.starsCollected}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Nível</p>
+                            <p className="text-xs font-bold text-purple-600">
+                              {card.stats.difficulty === 'EASY' ? 'FÁCIL' : card.stats.difficulty === 'MEDIUM' ? 'MÉDIO' : 'DIFÍCIL'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* Separador */}
+        {collectibleCards.length > 0 && savedMemories.length > 0 && (
+          <div className="my-6 border-t-2 border-dashed border-gray-300"></div>
+        )}
+
+        <h3 className="text-xl md:text-2xl font-display font-bold text-fabula-primary mb-4">
+          📜 Memórias Antigas
+        </h3>
+
         {savedMemories.length === 0 ? (
-            <div className="text-center py-20 bg-white/50 rounded-3xl border-2 border-dashed border-gray-300">
-                <Sparkles className="mx-auto text-gray-300 mb-4" size={48} />
-                <p className="text-2xl font-display text-gray-400">O baú ainda está vazio.</p>
-                <p className="text-gray-500">Jogue uma aventura para ganhar sua primeira carta!</p>
+            <div className="text-center py-12 md:py-20 bg-white/50 rounded-2xl md:rounded-3xl border-2 border-dashed border-gray-300">
+                <Sparkles className="mx-auto text-gray-300 mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12" />
+                <p className="text-xl md:text-2xl font-display text-gray-400">O baú ainda está vazio.</p>
+                <p className="text-sm md:text-base text-gray-500">Jogue uma aventura para ganhar sua primeira carta!</p>
             </div>
         ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-8 md:pb-12">
                 {savedMemories.map((memory) => {
                     const theme = memory.theme || CARD_THEMES[0];
                     return (
-                    <div key={memory.id} className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-2 relative overflow-hidden" style={{ border: theme.border }}>
+                    <div key={memory.id} className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg hover:shadow-2xl transition-shadow relative overflow-hidden" style={{ border: theme.border }}>
                         {/* Background Pattern */}
                         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: `url("${theme.pattern}")` }}></div>
 
                         <div className="relative z-10">
-                            <div className="flex justify-between items-center mb-4 pb-3 border-b-2" style={{ borderColor: theme.primary + '30' }}>
+                            <div className="flex justify-between items-center mb-3 md:mb-4 pb-2 md:pb-3 border-b-2" style={{ borderColor: theme.primary + '30' }}>
                                 {/* EXIBE O NOME DA JOGADORA AQUI */}
                                 <div className="flex items-center gap-2">
-                                    <div className="w-12 h-12 rounded-full overflow-hidden border-3 shadow-md" style={{ borderColor: theme.primary, borderWidth: '3px' }}>
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden border-2 md:border-3 shadow-md" style={{ borderColor: theme.primary, borderWidth: '2px' }}>
                                          <img
                                             src={memory.character === Character.SOPHIE ? "https://files.catbox.moe/lrszum.jpeg" : "https://files.catbox.moe/3qpa2c.jpeg"}
                                             alt={memory.character}
@@ -373,7 +542,7 @@ const App: React.FC = () => {
                                          />
                                     </div>
                                     <div>
-                                        <span className="font-display text-xl font-bold block" style={{ color: theme.primary }}>
+                                        <span className="font-display text-base md:text-xl font-bold block" style={{ color: theme.primary }}>
                                             {memory.character}
                                         </span>
                                         <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
@@ -387,20 +556,20 @@ const App: React.FC = () => {
                                 <span className="text-xs text-gray-400 font-bold bg-white px-2 py-1 rounded shadow-sm">{memory.date}</span>
                             </div>
 
-                            <div className="bg-white/90 backdrop-blur-sm p-5 rounded-xl mb-4 relative shadow-sm" style={{ border: `2px solid ${theme.primary}20` }}>
-                                 <Sparkles className="absolute -top-2 -right-2" size={24} fill={theme.accent} style={{ color: theme.accent }} />
-                                 <p className="italic text-gray-700 font-sans text-sm leading-relaxed">
+                            <div className="bg-white/90 backdrop-blur-sm p-3 md:p-5 rounded-lg md:rounded-xl mb-3 md:mb-4 relative shadow-sm" style={{ border: `2px solid ${theme.primary}20` }}>
+                                 <Sparkles className="absolute -top-2 -right-2 w-5 h-5 md:w-6 md:h-6" fill={theme.accent} style={{ color: theme.accent }} />
+                                 <p className="italic text-gray-700 font-sans text-xs md:text-sm leading-relaxed">
                                     "{memory.letter}"
                                  </p>
                             </div>
 
                             <div className="flex justify-between items-center">
                                 <div className="flex gap-1">
-                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
-                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
-                                    <Star size={16} className="fill-current" style={{ color: theme.accent }} />
+                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
+                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
+                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
                                 </div>
-                                <span className="text-sm font-bold px-3 py-1 rounded-full shadow-sm" style={{
+                                <span className="text-xs md:text-sm font-bold px-2 md:px-3 py-1 rounded-full shadow-sm" style={{
                                     backgroundColor: theme.primary + '20',
                                     color: theme.accent
                                 }}>
@@ -430,79 +599,133 @@ const App: React.FC = () => {
 
   // --- TELA FINAL ---
   const renderEnding = () => (
-    <div className="min-h-[100dvh] w-full bg-white p-4 md:p-6 py-8 md:py-12 overflow-y-auto flex items-center justify-center">
-       <div className="max-w-3xl w-full bg-white rounded-[2rem] shadow-2xl text-center relative z-10 my-auto" style={{ border: currentCardTheme.border }}>
+    <div className="min-h-[100dvh] w-full bg-white p-4 md:p-5 lg:p-6 py-6 md:py-6 lg:py-8 overflow-y-auto flex items-center justify-center">
+       <div className="max-w-2xl w-full bg-white rounded-[2rem] shadow-2xl text-center relative z-10 my-auto" style={{ border: currentCardTheme.border }}>
 
          {/* Header Sólido */}
-         <div className="p-8 border-b-4" style={{
+         <div className="p-4 md:p-5 lg:p-6 border-b-4" style={{
            backgroundColor: currentCardTheme.secondary + '40',
            borderColor: currentCardTheme.primary
          }}>
-            <Crown size={60} className="mx-auto mb-4 animate-bounce" style={{ color: currentCardTheme.primary }} />
-            <h2 className="text-5xl md:text-6xl font-display font-bold text-fabula-primary drop-shadow-sm">
+            <Crown size={40} className="mx-auto mb-2 md:mb-3 animate-bounce md:w-12 md:h-12 lg:w-14 lg:h-14" style={{ color: currentCardTheme.primary }} />
+            <h2 className="text-2xl md:text-3xl lg:text-5xl font-display font-bold text-fabula-primary drop-shadow-sm">
               Missão Cumprida!
             </h2>
-            <div className="text-sm font-bold mt-2 px-4 py-1 rounded-full inline-block" style={{
-              backgroundColor: currentCardTheme.primary + '20',
-              color: currentCardTheme.accent
-            }}>
-              ⭐ {currentCardTheme.name} ⭐
-            </div>
+            {currentCard && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="text-xs font-bold px-3 py-1 rounded-full inline-block" style={{
+                  backgroundColor: currentCardTheme.primary + '20',
+                  color: currentCardTheme.accent
+                }}>
+                  ⭐ {currentCardTheme.name} ⭐
+                </div>
+                <div
+                  className="text-xs font-bold px-3 py-1 rounded-full inline-block uppercase animate-pulse"
+                  style={{
+                    backgroundColor: getRarityColor(currentCard.rarity).bg,
+                    color: getRarityColor(currentCard.rarity).text,
+                    boxShadow: `0 0 15px ${getRarityColor(currentCard.rarity).glow}`,
+                    border: `2px solid ${getRarityColor(currentCard.rarity).border}`
+                  }}
+                >
+                  {currentCard.rarity === 'lendária' && '👑'} {currentCard.rarity}
+                </div>
+              </div>
+            )}
          </div>
 
-         <div className="p-4 md:p-6 lg:p-10" style={{ backgroundImage: `url("${currentCardTheme.pattern}")` }}>
+         <div className="p-4 md:p-5 lg:p-6" style={{ backgroundImage: `url("${currentCardTheme.pattern}")` }}>
              {/* Caixa da Carta (Design de Card Colecionável) */}
-             <div className="bg-white p-4 md:p-6 lg:p-8 rounded-2xl shadow-inner mb-6 md:mb-8 relative transform transition-all hover:scale-[1.02]" style={{
+             <div className="bg-white p-4 md:p-5 lg:p-6 rounded-xl shadow-inner mb-4 md:mb-5 lg:mb-6 relative" style={{
                border: `3px solid ${currentCardTheme.primary}30`
              }}>
-               <div className="absolute -top-3 -left-3 transform -rotate-12">
-                  <Star fill={currentCardTheme.accent} size={40} style={{ color: currentCardTheme.accent }} />
+               <div className="absolute -top-2 -left-2 transform -rotate-12">
+                  <Star fill={currentCardTheme.accent} size={28} className="md:w-8 md:h-8" style={{ color: currentCardTheme.accent }} />
                </div>
-               <div className="absolute -bottom-3 -right-3 transform rotate-12">
-                  <Heart fill={currentCardTheme.secondary} size={40} style={{ color: currentCardTheme.secondary }} />
+               <div className="absolute -bottom-2 -right-2 transform rotate-12">
+                  <Heart fill={currentCardTheme.secondary} size={28} className="md:w-8 md:h-8" style={{ color: currentCardTheme.secondary }} />
                </div>
 
-               <h3 className="text-xl font-bold text-fabula-primary uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
-                   <Sparkles size={20} /> Carta da Fada Mãe <Sparkles size={20} />
+               <h3 className="text-sm md:text-base lg:text-lg font-bold text-fabula-primary uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
+                   <Sparkles size={16} className="md:w-4 md:h-4" /> Carta da Fada Mãe <Sparkles size={16} className="md:w-4 md:h-4" />
                </h3>
-               
+
+               {/* Badge de Raridade na Carta */}
+               {!isLoadingLetter && currentCard && (
+                 <div className="flex justify-center mb-3">
+                   <div
+                     className="text-xs font-bold px-3 py-1.5 rounded-full uppercase"
+                     style={{
+                       backgroundColor: getRarityColor(currentCard.rarity).bg,
+                       color: getRarityColor(currentCard.rarity).text,
+                       boxShadow: `0 0 10px ${getRarityColor(currentCard.rarity).glow}`,
+                       border: `2px solid ${getRarityColor(currentCard.rarity).border}`
+                     }}
+                   >
+                     {currentCard.rarity === 'lendária' && '👑 '}
+                     {currentCard.rarity === 'épica' && '💎 '}
+                     {currentCard.rarity === 'rara' && '✨ '}
+                     {currentCard.rarity === 'comum' && '⭐ '}
+                     CARTA {currentCard.rarity.toUpperCase()}
+                   </div>
+                 </div>
+               )}
+
                {isLoadingLetter ? (
-                 <div className="py-12 flex flex-col items-center">
-                   <div className="animate-spin text-fabula-secondary mb-4"><Sparkles size={40} /></div>
-                   <p className="text-2xl font-display text-fabula-primary animate-pulse">Escrevendo magia...</p>
+                 <div className="py-6 md:py-8 flex flex-col items-center">
+                   <div className="animate-spin text-fabula-secondary mb-3"><Sparkles size={32} className="md:w-9 md:h-9" /></div>
+                   <p className="text-lg md:text-xl font-display text-fabula-primary animate-pulse">Escrevendo magia...</p>
                    <p className="text-xs text-gray-400 mt-2">♫ {SONG_LYRICS[lyricIndex]} ♫</p>
                  </div>
                ) : (
-                 <div className="bg-fabula-bg/50 p-6 rounded-xl border border-fabula-primary/5">
-                    <p className="text-xl md:text-2xl text-gray-700 font-sans italic leading-relaxed whitespace-pre-line">
+                 <div className="bg-fabula-bg/50 p-3 md:p-4 lg:p-5 rounded-lg border border-fabula-primary/5">
+                    <p className="text-sm md:text-base lg:text-lg text-gray-700 font-sans italic leading-relaxed whitespace-pre-line">
                         {fairyLetter}
                     </p>
                  </div>
                )}
              </div>
-             
+
              {/* Stats Grid */}
-             {!isLoadingLetter && (
-                <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8">
-                    <div className="bg-gray-50 p-3 md:p-4 rounded-xl text-center">
-                        <p className="text-xs text-gray-400 font-bold uppercase">Pontos Totais</p>
-                        <p className="text-2xl md:text-3xl font-display font-bold text-fabula-primary">{gameState.score}</p>
+             {!isLoadingLetter && currentCard && (
+                <div className="space-y-3 mb-4 md:mb-5">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 p-3 rounded-xl text-center">
+                            <p className="text-xs text-gray-400 font-bold uppercase">Pontos Totais</p>
+                            <p className="text-lg md:text-xl lg:text-2xl font-display font-bold text-fabula-primary">{gameState.score}</p>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-xl text-center">
+                            <p className="text-xs text-gray-400 font-bold uppercase">Jogadora</p>
+                            <p className="text-base md:text-lg lg:text-xl font-display font-bold text-fabula-secondary">{gameState.selectedCharacter}</p>
+                        </div>
                     </div>
-                    <div className="bg-gray-50 p-3 md:p-4 rounded-xl text-center">
-                        <p className="text-xs text-gray-400 font-bold uppercase">Jogadora</p>
-                        <p className="text-xl md:text-2xl font-display font-bold text-fabula-secondary">{gameState.selectedCharacter}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-yellow-50 p-2 rounded-lg text-center border border-yellow-200">
+                            <p className="text-xs text-gray-400 font-bold">⭐ Estrelas</p>
+                            <p className="text-sm font-bold text-yellow-600">{currentCard.stats.starsCollected}</p>
+                        </div>
+                        <div className="bg-purple-50 p-2 rounded-lg text-center border border-purple-200">
+                            <p className="text-xs text-gray-400 font-bold">🎯 Dificuldade</p>
+                            <p className="text-xs font-bold text-purple-600">
+                              {currentCard.stats.difficulty === 'EASY' ? 'FÁCIL' : currentCard.stats.difficulty === 'MEDIUM' ? 'MÉDIO' : 'DIFÍCIL'}
+                            </p>
+                        </div>
+                        <div className="bg-blue-50 p-2 rounded-lg text-center border border-blue-200">
+                            <p className="text-xs text-gray-400 font-bold">📜 Carta</p>
+                            <p className="text-sm font-bold text-blue-600">#{currentCard.metadata.cardNumber}</p>
+                        </div>
                     </div>
                 </div>
              )}
 
              {!isLoadingLetter && (
-                 <div className="flex flex-col gap-3 pb-2">
-                    <Button onClick={handleRestart} variant="primary" className="w-full py-3 md:py-4 text-lg md:text-xl animate-pulse">
+                 <div className="flex flex-col gap-2 md:gap-3 pb-2">
+                    <Button onClick={handleRestart} variant="primary" className="w-full py-3 text-base md:text-lg animate-pulse">
                         JOGAR NOVAMENTE
                     </Button>
                     <button
                         onClick={handleOpenMemories}
-                        className="text-gray-400 font-bold text-sm hover:text-fabula-primary transition-colors py-2"
+                        className="text-gray-400 font-bold text-xs md:text-sm hover:text-fabula-primary transition-colors py-2"
                     >
                         Ver Galeria de Memórias
                     </button>

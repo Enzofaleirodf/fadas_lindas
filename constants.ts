@@ -7,7 +7,7 @@ export const LORE = {
   },
   mission1: {
     title: "O Laser de Luz",
-    text: "A Cárie travessa (mas fofinha!) está pulando pelo consultório. Use o Laser de Alta Potência para transformar todas elas em brilho!",
+    text: "A Cárie travessa está pulando pelo consultório. Use o Laser de Alta Potência para transformar todas elas em brilho!",
   },
   mission2: {
     title: "A Memória Mágica", 

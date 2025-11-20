@@ -127,7 +127,7 @@ export const MemoryGame: React.FC<MemoryGameProps> = ({ onComplete, difficulty }
             `}
         >
             {card.isFlipped || card.isMatched ? (
-                <span className="text-4xl md:text-6xl animate-bounce select-none">{card.emoji}</span>
+                <span className="text-4xl md:text-6xl select-none">{card.emoji}</span>
             ) : (
                 <Sparkles className="text-white opacity-60 w-8 h-8 md:w-12 md:h-12" />
             )}
@@ -137,38 +137,38 @@ export const MemoryGame: React.FC<MemoryGameProps> = ({ onComplete, difficulty }
 
       {/* TELA DE VITÓRIA (Overlay) */}
       {isFinished && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl p-8 text-center animate-fade-in">
-           <div className="relative mb-6">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl p-4 md:p-8 text-center animate-fade-in overflow-y-auto">
+           <div className="relative mb-3 md:mb-6">
                <div className="absolute inset-0 bg-yellow-200 blur-xl rounded-full animate-pulse"></div>
-               <Trophy size={80} className="text-yellow-400 fill-yellow-400 relative z-10 animate-bounce" />
+               <Trophy size={60} className="text-yellow-400 fill-yellow-400 relative z-10 animate-bounce md:w-20 md:h-20" />
            </div>
 
-           <h3 className="text-4xl md:text-5xl font-display font-bold text-fabula-primary mb-2">
+           <h3 className="text-3xl md:text-5xl font-display font-bold text-fabula-primary mb-2">
             Memória Brilhante!
            </h3>
-           
-           <div className="flex items-center gap-2 mb-6">
-             <Star className="text-fabula-accent fill-fabula-accent" size={24} />
-             <p className="text-xl text-gray-600 font-bold">Você encontrou todos os pares!</p>
-             <Star className="text-fabula-accent fill-fabula-accent" size={24} />
+
+           <div className="flex items-center gap-2 mb-4 md:mb-6">
+             <Star className="text-fabula-accent fill-fabula-accent w-5 h-5 md:w-6 md:h-6" />
+             <p className="text-base md:text-xl text-gray-600 font-bold">Você encontrou todos os pares!</p>
+             <Star className="text-fabula-accent fill-fabula-accent w-5 h-5 md:w-6 md:h-6" />
            </div>
 
-           <div className="bg-fabula-accent/10 p-6 rounded-2xl border-2 border-fabula-accent/20 mb-8 w-full max-w-sm">
-              <div className="flex justify-between items-center mb-3">
+           <div className="bg-fabula-accent/10 p-4 md:p-6 rounded-2xl border-2 border-fabula-accent/20 mb-4 md:mb-8 w-full max-w-sm">
+              <div className="flex justify-between items-center mb-2 md:mb-3">
                   <div className="flex items-center gap-2">
-                      <Brain size={20} className="text-fabula-primary" />
-                      <span className="text-gray-600 font-bold uppercase text-sm">Jogadas</span>
+                      <Brain size={18} className="text-fabula-primary md:w-5 md:h-5" />
+                      <span className="text-gray-600 font-bold uppercase text-xs md:text-sm">Jogadas</span>
                   </div>
-                  <span className="text-2xl font-display font-bold text-fabula-primary">{moves}</span>
+                  <span className="text-xl md:text-2xl font-display font-bold text-fabula-primary">{moves}</span>
               </div>
               <div className="w-full h-px bg-fabula-accent/20 my-2"></div>
               <div className="flex justify-between items-center">
-                  <span className="text-gray-600 font-bold uppercase text-sm">Pontuação</span>
-                  <span className="text-4xl font-display font-bold text-fabula-secondary">{finalScore}</span>
+                  <span className="text-gray-600 font-bold uppercase text-xs md:text-sm">Pontuação</span>
+                  <span className="text-3xl md:text-4xl font-display font-bold text-fabula-secondary">{finalScore}</span>
               </div>
            </div>
 
-           <Button onClick={() => onComplete(finalScore)} variant="primary" className="animate-pulse shadow-xl">
+           <Button onClick={() => onComplete(finalScore)} variant="primary" className="animate-pulse shadow-xl text-base md:text-lg px-6 md:px-8 py-3 md:py-4">
              PRÓXIMA FASE
            </Button>
         </div>
