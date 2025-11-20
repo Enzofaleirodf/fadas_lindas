@@ -72,8 +72,16 @@ const App: React.FC = () => {
   };
 
   const handleOpenMemories = () => {
-    setSavedMemories(storageService.getMemories());
+    const memories = storageService.getMemories();
+    setSavedMemories(memories);
     setGameState(prev => ({ ...prev, stage: AppStage.MEMORIES }));
+  };
+
+  // Calcula o melhor score de cada personagem
+  const getBestScoreByCharacter = (character: Character) => {
+    return savedMemories
+      .filter(m => m.character === character)
+      .reduce((max, m) => Math.max(max, m.score), 0);
   };
 
   const toggleMute = () => {
@@ -291,13 +299,50 @@ const App: React.FC = () => {
            <div className="w-12"></div> 
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center border-l-8 border-fabula-secondary">
-            <div className="mb-4 md:mb-0 text-center md:text-left">
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Seu Melhor Recorde</p>
-                <p className="text-5xl font-display font-bold text-fabula-primary">{bestScore} pts</p>
+        {/* Cards de Recordes - Um para cada Fada */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            {/* Recorde da Fada Sophie */}
+            <div className="bg-white p-6 rounded-3xl shadow-lg flex flex-col items-center border-4 border-fabula-secondary relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-fabula-secondary/10 w-32 h-32 rounded-full -mr-16 -mt-16"></div>
+                <div className="relative z-10 flex flex-col items-center w-full">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-fabula-secondary shadow-lg mb-3">
+                        <img
+                            src="https://files.catbox.moe/lrszum.jpeg"
+                            alt="Fada Sophie"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
+                    <h3 className="text-2xl font-display font-bold text-fabula-secondary mb-2">Fada Sophie</h3>
+                    <div className="flex items-center gap-2">
+                        <Trophy size={24} className="text-yellow-500 fill-yellow-500" />
+                        <p className="text-4xl font-display font-bold text-fabula-primary">
+                            {getBestScoreByCharacter(Character.SOPHIE)} pts
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div className="bg-yellow-100 p-4 rounded-full">
-                <Trophy size={48} className="text-yellow-500 fill-yellow-500" />
+
+            {/* Recorde da Fada Julie */}
+            <div className="bg-white p-6 rounded-3xl shadow-lg flex flex-col items-center border-4 border-fabula-accent relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-fabula-accent/10 w-32 h-32 rounded-full -mr-16 -mt-16"></div>
+                <div className="relative z-10 flex flex-col items-center w-full">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-fabula-accent shadow-lg mb-3">
+                        <img
+                            src="https://files.catbox.moe/3qpa2c.jpeg"
+                            alt="Fada Julie"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Recorde</p>
+                    <h3 className="text-2xl font-display font-bold text-fabula-accent mb-2">Fada Julie</h3>
+                    <div className="flex items-center gap-2">
+                        <Trophy size={24} className="text-yellow-500 fill-yellow-500" />
+                        <p className="text-4xl font-display font-bold text-fabula-primary">
+                            {getBestScoreByCharacter(Character.JULIE)} pts
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 
