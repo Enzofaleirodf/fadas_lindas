@@ -249,8 +249,8 @@ const App: React.FC = () => {
           <div onClick={() => selectCharacter(Character.SOPHIE)} className="cursor-pointer group flex-1 max-w-[220px]">
             <div className="relative bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center border-4 border-fabula-secondary p-4 transition-transform active:scale-95 hover:scale-105 h-full">
               <div className="relative w-fit mx-auto mb-4">
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 animate-bounce">
-                      <Crown className="text-fabula-secondary fill-fabula-secondary drop-shadow-md" size={40} />
+                  <div className="absolute -top-8 left-1/2 z-20" style={{ marginLeft: '-20px' }}>
+                      <Crown className="text-fabula-secondary fill-fabula-secondary drop-shadow-md animate-bounce" size={40} />
                   </div>
                   <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-fabula-secondary shadow-md bg-pink-50 relative z-10">
                       <img src="https://files.catbox.moe/lrszum.jpeg" alt="Fada Sophie" className="w-full h-full object-cover" />
@@ -267,8 +267,8 @@ const App: React.FC = () => {
           <div onClick={() => selectCharacter(Character.JULIE)} className="cursor-pointer group flex-1 max-w-[220px]">
             <div className="relative bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center border-4 border-fabula-accent p-4 transition-transform active:scale-95 hover:scale-105 h-full">
               <div className="relative w-fit mx-auto mb-4">
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 animate-bounce" style={{ animationDelay: '0.5s' }}>
-                      <Crown className="text-fabula-accent fill-fabula-accent drop-shadow-md" size={40} />
+                  <div className="absolute -top-8 left-1/2 z-20" style={{ marginLeft: '-20px' }}>
+                      <Crown className="text-fabula-accent fill-fabula-accent drop-shadow-md animate-bounce" size={40} style={{ animationDelay: '0.5s' }} />
                   </div>
                   <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-fabula-accent shadow-md bg-teal-50 relative z-10">
                       <img src="https://files.catbox.moe/3qpa2c.jpeg" alt="Fada Julie" className="w-full h-full object-cover" />

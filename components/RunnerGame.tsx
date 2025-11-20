@@ -98,7 +98,7 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
          obstaclesRef.current.push({
              id: obstacleIdRef.current++,
              x: 130,
-             y: 55,
+             y: 50, // Centro vertical (castelo ocupa altura toda)
              type: 'castle'
          });
     }
@@ -115,12 +115,12 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
         });
     }
 
-    // Mover e filtrar obstáculos (para castelo quando ganha)
+    // Mover e filtrar obstáculos (para castelo quando chega na fada)
     obstaclesRef.current = obstaclesRef.current
         .map(obs => {
-          // Se venceu, para o castelo
-          if (obs.type === 'castle' && (gameOverRef.current || isLanding)) {
-            return obs; // Não move mais
+          // Para o castelo quando chega na posição da fada
+          if (obs.type === 'castle' && obs.x <= 20) {
+            return { ...obs, x: 20 }; // Trava na posição
           }
           return { ...obs, x: obs.x - gameSpeed };
         })
@@ -130,23 +130,16 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
     const idsToRemove: number[] = [];
 
     obstaclesRef.current.forEach(obs => {
-      // Vitória com castelo - detecção melhorada
+      // Vitória com castelo - detecção quando toca
       if (obs.type === 'castle' && !gameOverRef.current) {
-        const FAIRY_X = 10; // Posição da fada (left-10 = 10%)
-        const CASTLE_TRIGGER_X = 15; // Margem de segurança
-        const CASTLE_Y = 55; // Posição do castelo
+        const FAIRY_X = 10;
+        const CASTLE_X = 20;
 
-        // Detecta quando castelo passa pela fada
-        if (obs.x <= CASTLE_TRIGGER_X && obs.x >= -5) {
-          // Verifica alinhamento vertical - JANELA GRANDE para facilitar
-          if (Math.abs(playerPositionRef.current - CASTLE_Y) < 40) {
-            handleWin();
-            return;
-          }
-        }
-
-        // Se castelo passou (X < -5), sempre vence pois chegou até o final
-        if (obs.x < -5) {
+        // Castelo chegou na posição da fada
+        if (obs.x <= CASTLE_X && obs.x >= CASTLE_X - 2) {
+          // Move fada para o centro do castelo
+          playerPositionRef.current = 50;
+          setPlayerPosition(50);
           handleWin();
           return;
         }
@@ -235,17 +228,19 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   };
 
   const handleWin = () => {
-    setIsLanding(true); // Ativa animação de pouso
+    if (gameOverRef.current) return; // Evita múltiplas chamadas
 
-    // Pequeno delay para animação de chegada
+    setIsLanding(true);
+    audioService.playWin();
+
+    // Animação de pouso e vitória
     setTimeout(() => {
       gameOverRef.current = true;
       setHasWon(true);
       setIsPlaying(false);
       setGameOver(true);
       setScore(settings.goal);
-      audioService.playWin();
-    }, 800); // 800ms para animação
+    }, 1200); // Tempo para animação completa
   };
 
   useEffect(() => {
@@ -356,16 +351,24 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
 
         {/* Fada (Player) */}
         <div
-            className={`absolute left-10 w-16 h-16 transition-all z-20
+            className={`absolute w-16 h-16 transition-all z-30
               ${hasWon ? 'opacity-0' : 'opacity-100'}
               ${isInvulnerable ? 'animate-pulse' : ''}
-              ${isLanding ? 'animate-bounce duration-500' : 'duration-75 ease-out'}
+              ${isLanding ? 'scale-125 duration-500' : 'duration-75 ease-out'}
             `}
-            style={{ top: `${playerPosition}%`, transform: 'translateY(-50%)' }}
+            style={{
+              left: isLanding ? '20%' : '10%',
+              top: `${playerPosition}%`,
+              transform: 'translateY(-50%)',
+              transition: isLanding ? 'all 1s ease-in-out' : 'top 75ms ease-out, left 0s'
+            }}
         >
             <div className="relative">
-                <div className={`absolute -inset-4 blur-md rounded-full ${isInvulnerable ? 'bg-red-400/60' : 'bg-white/40'}`}></div>
-                <span className="text-5xl drop-shadow-lg relative z-10">🧚‍♀️</span>
+                <div className={`absolute -inset-4 blur-md rounded-full ${
+                  isLanding ? 'bg-yellow-300/80 animate-pulse' :
+                  isInvulnerable ? 'bg-red-400/60' : 'bg-white/40'
+                }`}></div>
+                <span className={`text-5xl drop-shadow-lg relative z-10 ${isLanding ? 'animate-bounce' : ''}`}>🧚‍♀️</span>
             </div>
         </div>
 
@@ -383,12 +386,18 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
                 }}
             >
                 {obs.type === 'castle' ? (
-                     // Imagem do Castelo
-                     <img 
-                       src="https://files.catbox.moe/dajv5y.png" 
+                     // Imagem do Castelo (ajustada para não cortar)
+                     <img
+                       src="https://files.catbox.moe/dajv5y.png"
                        alt="Castelo da Fábula"
-                       className="h-64 w-auto object-contain drop-shadow-2xl"
-                       style={{ transform: 'scale(1.5)' }}
+                       className="drop-shadow-2xl"
+                       style={{
+                         height: '350px',
+                         width: 'auto',
+                         objectFit: 'contain',
+                         filter: isLanding ? 'brightness(1.2) drop-shadow(0 0 20px gold)' : 'none',
+                         transition: 'filter 0.5s'
+                       }}
                      />
                 ) : obs.type === 'star' ? (
                     <Star className="text-yellow-400 fill-yellow-400 w-10 h-10 animate-spin" />
