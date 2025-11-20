@@ -24,7 +24,7 @@ class AudioService {
 
   async tryAutoplay() {
     this.init();
-    
+
     // Tenta tocar o MP3 se existir URL
     if (BACKGROUND_MUSIC_URL && !this.bgMusic) {
       this.bgMusic = new Audio(BACKGROUND_MUSIC_URL);
@@ -32,16 +32,18 @@ class AudioService {
       this.bgMusic.volume = 0.4; // Volume agradável
     }
 
-    if (this.bgMusic && !this.isPlaying && !this.isMuted) {
+    if (this.bgMusic && !this.isMuted) {
       try {
+        // Força play mesmo se já estiver marcado como playing
         await this.bgMusic.play();
         this.isPlaying = true;
       } catch (e) {
         // Autoplay bloqueado, aguarda interação
+        console.log('Autoplay bloqueado - aguardando interação do usuário');
       }
-    } else if (!BACKGROUND_MUSIC_URL) {
+    } else if (!BACKGROUND_MUSIC_URL && !this.isPlaying) {
       // Fallback para sintetizador apenas se não tiver MP3
-      this.playBackgroundMelody(); 
+      this.playBackgroundMelody();
     }
   }
 

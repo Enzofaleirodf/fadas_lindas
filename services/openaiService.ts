@@ -156,13 +156,13 @@ export const generateCollectibleCard = async (
   context: GameContext
 ): Promise<CollectibleCard> => {
   // Verificar API key
-  if (!process.env.OPENAI_API_KEY) {
+  if (!import.meta.env.VITE_OPENAI_API_KEY) {
     return createFallbackCard(context);
   }
 
   try {
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: import.meta.env.VITE_OPENAI_API_KEY,
       dangerouslyAllowBrowser: true // Para desenvolvimento
     });
 

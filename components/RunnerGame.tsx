@@ -131,17 +131,24 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
 
     obstaclesRef.current.forEach(obs => {
       // Vitória com castelo - detecção melhorada
-      if (obs.type === 'castle') {
+      if (obs.type === 'castle' && !gameOverRef.current) {
         const FAIRY_X = 10; // Posição da fada (left-10 = 10%)
         const CASTLE_TRIGGER_X = 15; // Margem de segurança
+        const CASTLE_Y = 55; // Posição do castelo
 
         // Detecta quando castelo passa pela fada
-        if (obs.x <= CASTLE_TRIGGER_X && obs.x > 0) {
-          // Verifica alinhamento vertical (player perto do centro Y=55)
-          if (Math.abs(playerPositionRef.current - 55) < 25) {
+        if (obs.x <= CASTLE_TRIGGER_X && obs.x >= -5) {
+          // Verifica alinhamento vertical - JANELA GRANDE para facilitar
+          if (Math.abs(playerPositionRef.current - CASTLE_Y) < 40) {
             handleWin();
             return;
           }
+        }
+
+        // Se castelo passou (X < -5), sempre vence pois chegou até o final
+        if (obs.x < -5) {
+          handleWin();
+          return;
         }
       }
 
@@ -275,7 +282,8 @@ export const RunnerGame: React.FC<RunnerGameProps> = ({ onComplete, characterNam
   return (
     <div
       ref={containerRef}
-      className="w-full max-w-4xl h-96 md:h-[500px] bg-blue-100 rounded-3xl relative overflow-hidden shadow-2xl border-4 border-fabula-secondary cursor-none touch-none"
+      className="w-full max-w-4xl h-96 md:h-[500px] bg-blue-100 rounded-3xl relative overflow-hidden shadow-2xl border-4 border-fabula-secondary touch-none"
+      style={{ cursor: typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches ? 'none' : 'default' }}
       onMouseMove={handleInput}
       onTouchMove={handleInput}
     >
