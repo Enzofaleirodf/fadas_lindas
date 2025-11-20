@@ -475,8 +475,8 @@ const App: React.FC = () => {
 
                       {/* Card Content */}
                       <div className="p-4">
-                        <div className="bg-gray-50 p-3 rounded-lg mb-3 min-h-[80px]">
-                          <p className="text-xs italic text-gray-700 line-clamp-4">
+                        <div className="bg-gray-50 p-3 rounded-lg mb-3 min-h-[80px] max-h-[200px] overflow-y-auto">
+                          <p className="text-xs italic text-gray-700">
                             "{card.letterText}"
                           </p>
                         </div>
@@ -506,80 +506,12 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Separador */}
-        {collectibleCards.length > 0 && savedMemories.length > 0 && (
-          <div className="my-6 border-t-2 border-dashed border-gray-300"></div>
-        )}
-
-        <h3 className="text-xl md:text-2xl font-display font-bold text-fabula-primary mb-4">
-          📜 Memórias Antigas
-        </h3>
-
-        {savedMemories.length === 0 ? (
+        {/* Empty state quando não há cartas */}
+        {collectibleCards.length === 0 && (
             <div className="text-center py-12 md:py-20 bg-white/50 rounded-2xl md:rounded-3xl border-2 border-dashed border-gray-300">
                 <Sparkles className="mx-auto text-gray-300 mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12" />
                 <p className="text-xl md:text-2xl font-display text-gray-400">O baú ainda está vazio.</p>
                 <p className="text-sm md:text-base text-gray-500">Jogue uma aventura para ganhar sua primeira carta!</p>
-            </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-8 md:pb-12">
-                {savedMemories.map((memory) => {
-                    const theme = memory.theme || CARD_THEMES[0];
-                    return (
-                    <div key={memory.id} className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg hover:shadow-2xl transition-shadow relative overflow-hidden" style={{ border: theme.border }}>
-                        {/* Background Pattern */}
-                        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: `url("${theme.pattern}")` }}></div>
-
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-center mb-3 md:mb-4 pb-2 md:pb-3 border-b-2" style={{ borderColor: theme.primary + '30' }}>
-                                {/* EXIBE O NOME DA JOGADORA AQUI */}
-                                <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden border-2 md:border-3 shadow-md" style={{ borderColor: theme.primary, borderWidth: '2px' }}>
-                                         <img
-                                            src={memory.character === Character.SOPHIE ? "https://files.catbox.moe/lrszum.jpeg" : "https://files.catbox.moe/3qpa2c.jpeg"}
-                                            alt={memory.character}
-                                            className="w-full h-full object-cover"
-                                         />
-                                    </div>
-                                    <div>
-                                        <span className="font-display text-base md:text-xl font-bold block" style={{ color: theme.primary }}>
-                                            {memory.character}
-                                        </span>
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
-                                            backgroundColor: theme.secondary + '40',
-                                            color: theme.accent
-                                        }}>
-                                            {theme.name}
-                                        </span>
-                                    </div>
-                                </div>
-                                <span className="text-xs text-gray-400 font-bold bg-white px-2 py-1 rounded shadow-sm">{memory.date}</span>
-                            </div>
-
-                            <div className="bg-white/90 backdrop-blur-sm p-3 md:p-5 rounded-lg md:rounded-xl mb-3 md:mb-4 relative shadow-sm" style={{ border: `2px solid ${theme.primary}20` }}>
-                                 <Sparkles className="absolute -top-2 -right-2 w-5 h-5 md:w-6 md:h-6" fill={theme.accent} style={{ color: theme.accent }} />
-                                 <p className="italic text-gray-700 font-sans text-xs md:text-sm leading-relaxed">
-                                    "{memory.letter}"
-                                 </p>
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                                <div className="flex gap-1">
-                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
-                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
-                                    <Star size={14} className="fill-current md:w-4 md:h-4" style={{ color: theme.accent }} />
-                                </div>
-                                <span className="text-xs md:text-sm font-bold px-2 md:px-3 py-1 rounded-full shadow-sm" style={{
-                                    backgroundColor: theme.primary + '20',
-                                    color: theme.accent
-                                }}>
-                                    Score: {memory.score}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    );
-                })}
             </div>
         )}
       </div>
