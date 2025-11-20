@@ -333,7 +333,18 @@ const App: React.FC = () => {
            <h2 className="text-2xl md:text-4xl font-display font-bold text-fabula-primary flex items-center gap-2">
              <Archive className="text-fabula-secondary w-6 h-6 md:w-8 md:h-8" /> Galeria Mágica
            </h2>
-           <div className="w-8 md:w-12"></div>
+           <button
+             onClick={() => {
+               if (window.confirm('🗑️ Tem certeza que quer limpar TODAS as cartas e recordes? Esta ação não pode ser desfeita!')) {
+                 localStorage.clear();
+                 window.location.reload();
+               }
+             }}
+             className="p-2 md:p-3 bg-red-500 text-white rounded-full shadow-md hover:scale-105 hover:bg-red-600 transition-all text-xs font-bold"
+             title="Limpar todas as cartas"
+           >
+             🗑️
+           </button>
         </div>
 
         {/* Cards de Recordes - Um para cada Fada */}
